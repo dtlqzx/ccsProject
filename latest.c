@@ -168,23 +168,23 @@ measure:
 // 	LCD_Freq_Vrms(freq,floatVrms);
 // 	delay_nms(100);
 
-	PrintFreq(freq);
 	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
 
 	next = 0;
   while(1)
   {
-  	if(next == 1)
-  	{
-  	   goto measure;
-  	}
-  	else
-  	{
-    	// for(cnt = 0;cnt < 50;cnt ++)
-    	// {
-    	// 	writeWord(adcbuff[cnt],1);
-    	// }
-  	}
+	PrintFreq(freq);
+//  	if(next == 1)
+//  	{
+//  	   goto measure;
+//  	}
+//  	else
+//  	{
+//    	// for(cnt = 0;cnt < 50;cnt ++)
+//    	// {
+//    	// 	writeWord(adcbuff[cnt],1);
+//    	// }
+//  	}
   }
 }
 #pragma vector = PORT1_VECTOR
