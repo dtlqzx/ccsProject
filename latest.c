@@ -23,6 +23,7 @@
 *测类型需与实际电路板联测确定参数，目前基本能辨别信号源
 *
 *****************************************************************/
+
 #include <intrinsics.h>
 #include <msp430g2253.h>
 #include <msp430.h>
@@ -145,52 +146,30 @@ void main()
 measure:
 	LCD_write_command(0x01);
 
-	uint8_t signalType = 0;
-	while(1)
-	{
-		signalType = JudgeType();
-		switch(signalType)
-		{
-		case 1:
-			LCD_Type_Vpp("square",11.1);
-			break;
-		case 2:
-			LCD_Type_Vpp("Triangle",11.1);
-			break;
-		case 3:
-			LCD_Type_Vpp("Sin",11.1);
-			break;
-		default:
-			break;
-		}
-	}
 
-
-	__delay_cycles(LONGTIME);
-
-//	测量有效值部分
-   LCD_write_command(0x01);
-
-	for(cnt = 0;cnt < 50;cnt++)
-	{
-		StartADCConvert();
-	}
-	for(cnt = 0;cnt < 50;cnt++)
-	{
-		floatBuf = adcbuff[cnt]* 3300.0 / 1023.0;
-		floatSum = floatSum + floatBuf * floatBuf;
-	}
-	floatSum = floatSum / 50;
-	floatVrms = SqrtByNewton(floatSum);
-	floatSum = 0;
-
-	delay_nms(100);
-	__delay_cycles(8000000);
-	LCD_Freq_Vrms(freq,floatVrms);
-	delay_nms(100);
+// //	测量有效值部分
+//    LCD_write_command(0x01);
+//
+// 	for(cnt = 0;cnt < 50;cnt++)
+// 	{
+// 		StartADCConvert();
+// 	}
+// 	for(cnt = 0;cnt < 50;cnt++)
+// 	{
+// 		floatBuf = adcbuff[cnt]* 3300.0 / 1023.0;
+// 		floatSum = floatSum + floatBuf * floatBuf;
+// 	}
+// 	floatSum = floatSum / 50;
+// 	floatVrms = SqrtByNewton(floatSum);
+// 	floatSum = 0;
+//
+// 	delay_nms(100);
+// 	__delay_cycles(8000000);
+// 	LCD_Freq_Vrms(freq,floatVrms);
+// 	delay_nms(100);
 
 	PrintFreq(freq);
-	Print_Type_Real_Full(signalType,floatVrms,fvpp);
+	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
 
 	next = 0;
   while(1)
@@ -201,10 +180,10 @@ measure:
   	}
   	else
   	{
-    	for(cnt = 0;cnt < 50;cnt ++)
-    	{
-    		writeWord(adcbuff[cnt],1);
-    	}
+    	// for(cnt = 0;cnt < 50;cnt ++)
+    	// {
+    	// 	writeWord(adcbuff[cnt],1);
+    	// }
   	}
   }
 }
