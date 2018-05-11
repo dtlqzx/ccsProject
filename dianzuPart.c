@@ -63,11 +63,7 @@ uint16_t freqCnt = 0;
 uint16_t T = 0;
 const uint16_t t_1s = 20;
 
-//表达电容部分变量
-volatile float Cvalue = 0;
 
-
-//判断部分变量
 const int low = 5,mid = 10,high = 300;
 uint8_t lowNum = 0,midNum = 0,highNum = 0;
 
@@ -133,15 +129,16 @@ void main()
 	LCD_init();
 	IniADC();
 	IniButton();
-	initSPI_Soft();
+//	initSPI_Soft();
     __bis_SR_register(GIE);
 
 	uint16_t data = 12;
 	float voltage = 3.1;
 	uint8_t cnt = 0,cnt1 = 0;
 	volatile float fvpp = 0.0f;
-	float floatBuf = 0;
-	float floatSum = 0;
+	volatile float floatBuf = 0;
+	volatile float floatSum = 0;
+	volatile float dianzuzhi = 0;
 	float floatVrms = 0;
 	LCD_write_command(0x01);
 	LCD_stuNum();
@@ -151,39 +148,54 @@ measure:
 	LCD_write_command(0x01);
 
 
-// //	测量有效值部分
-//    LCD_write_command(0x01);
-//
+// 	floatSum = 0;
+// //	测量电压部分
 // 	for(cnt = 0;cnt < 50;cnt++)
 // 	{
 // 		StartADCConvert();
 // 	}
+//
 // 	for(cnt = 0;cnt < 50;cnt++)
 // 	{
-// 		floatBuf = adcbuff[cnt]* 3300.0 / 1023.0;
-// 		floatSum = floatSum + floatBuf * floatBuf;
+// 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
+// 		floatSum = floatSum + floatBuf;
 // 	}
-// 	floatSum = floatSum / 50;
-// 	floatVrms = SqrtByNewton(floatSum);
-// 	floatSum = 0;
+// 	floatSum = floatSum / 50.0;
+// 	dianzuzhi = (floatSum*2000.0)/(2.5 - floatSum);
+// 	PrintFloat(dianzuzhi);
 //
-// 	delay_nms(100);
-// 	__delay_cycles(8000000);
-// 	LCD_Freq_Vrms(freq,floatVrms);
-// 	delay_nms(100);
+// 	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
+//
+//	next = 0;
+//
+//
+//	/**** IO ZZZ or GND ****/
+//
+////	P2DIR |= BIT0;
+////	P2OUT &= BIT0;
+//	//	//------以下是高阻，以上是接地--------
+//	P2DIR &= BIT0;
+//
+//
+//	P2DIR |= BIT1;
+//	P2OUT &= BIT1;
+//	//	//------以下是高阻，以上是接地--------
+////	P2DIR &= BIT1;
+//
+//
+////	P2DIR |= BIT2;
+////	P2OUT &= BIT2;
+//	//	//------以下是高阻，以上是接地--------
+//	P2DIR &= BIT2;
+//
+//
+//	/**** IO ZZZ or GND ****/
 
-	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
 
-	next = 0;
-	while(1)
-	{
 
+  while(1)
+  {
 	PrintFreq(freq);
-	Cvalue = 1000000.0*1.44/300000.0/freq;
-	PrintString("\nCvalue = ");//乘1000000，代表电容单位是微法拉
-	PrintFloat(Cvalue);
-	__delay_cycles(1000000);
-
 //  	if(next == 1)
 //  	{
 //  	   goto measure;
@@ -195,7 +207,7 @@ measure:
 //    	// 	writeWord(adcbuff[cnt],1);
 //    	// }
 //  	}
-	}
+  }
 }
 #pragma vector = PORT1_VECTOR
 __interrupt void Port1_ISR(void)
