@@ -275,7 +275,7 @@ void main()
 			adcbuff[cnt] = 0;
 		}
 		//计算待测电阻值
-//		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
+		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
 		//计算待测电阻值  结束
 		if(displayStatus == 3)
 		{
