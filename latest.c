@@ -461,6 +461,9 @@ void IniTimerA1_ct()
     TA0CCTL1 &= ~CAP;
     /*设置比较输出模式*/
     TA0CCTL1 |= OUTMOD_6;
+		/*设置IO复用*/
+		P1SEL |= BIT6;
+		P1DIR |= BIT6;
 }
 void SpiWriteDAC(uint16_t data,uint8_t channel)
 {
