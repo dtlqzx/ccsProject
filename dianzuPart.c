@@ -47,8 +47,32 @@
 #define LCD_DATA    BIT7|BIT6|BIT5|BIT4   //4位数据线连接模式
 #define ADCBUFSIZE 50
 #define LONGTIME 40000000
+/************************IO part*******************/
+#define DIR2_0 P2DIR & BIT0
+#define DIR2_1 P2DIR & BIT1
+#define DIR2_2 P2DIR & BIT2
+#define OUT2_0 P2OUT & BIT0
+#define OUT2_1 P2OUT & BIT1
+#define OUT2_2 P2OUT & BIT2
 
-uint16_t adcbuff[50] = {0};
+#define P2_0_SET_HIGH P2DIR &= ~BIT0
+#define P2_1_SET_HIGH P2DIR &= ~BIT1
+#define P2_2_SET_HIGH P2DIR &= ~BIT2
+#define P2_0_SET_GND P2DIR |= BIT0; P2OUT &= ~BIT0;
+#define P2_1_SET_GND P2DIR |= BIT1; P2OUT &= ~BIT1;
+#define P2_2_SET_GND P2DIR |= BIT2; P2OUT &= ~BIT2;
+
+#define P2_0_IS_HIGH (~DIR2_0)
+#define P2_1_IS_HIGH (~DIR2_1)
+#define P2_2_IS_HIGH (~DIR2_2)
+#define P2_0_IS_GND (DIR2_0) && (~OUT2_0)
+#define P2_1_IS_GND (DIR2_1) && (~OUT2_1)
+#define P2_2_IS_GND (DIR2_2) && (~OUT2_2)
+
+
+
+/**************************************************/
+volatile uint16_t adcbuff[50] = {0};
 int16_t typeBuff[50] = {0};
 //uint16_t maxval[50] = {0};
 //uint16_t minval[50] = {0};
@@ -138,75 +162,67 @@ void main()
 	volatile float fvpp = 0.0f;
 	volatile float floatBuf = 0;
 	volatile float floatSum = 0;
+	volatile float R_know = 0.01;
 	volatile float dianzuzhi = 0;
 	float floatVrms = 0;
 	LCD_write_command(0x01);
 	LCD_stuNum();
 	LCD_stuNum();
 	__delay_cycles(LONGTIME);
-measure:
 	LCD_write_command(0x01);
-
-
-// 	floatSum = 0;
-// //	测量电压部分
-// 	for(cnt = 0;cnt < 50;cnt++)
-// 	{
-// 		StartADCConvert();
-// 	}
-//
-// 	for(cnt = 0;cnt < 50;cnt++)
-// 	{
-// 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
-// 		floatSum = floatSum + floatBuf;
-// 	}
-// 	floatSum = floatSum / 50.0;
-// 	dianzuzhi = (floatSum*2000.0)/(2.5 - floatSum);
-// 	PrintFloat(dianzuzhi);
-//
-// 	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
-//
-//	next = 0;
-//
-//
-//	/**** IO ZZZ or GND ****/
-//
-////	P2DIR |= BIT0;
-////	P2OUT &= BIT0;
-//	//	//------以下是高阻，以上是接地--------
-//	P2DIR &= BIT0;
-//
-//
-//	P2DIR |= BIT1;
-//	P2OUT &= BIT1;
-//	//	//------以下是高阻，以上是接地--------
-////	P2DIR &= BIT1;
-//
-//
-////	P2DIR |= BIT2;
-////	P2OUT &= BIT2;
-//	//	//------以下是高阻，以上是接地--------
-//	P2DIR &= BIT2;
-//
-//
-//	/**** IO ZZZ or GND ****/
-
 
 
   while(1)
   {
-	PrintFreq(freq);
-//  	if(next == 1)
-//  	{
-//  	   goto measure;
-//  	}
-//  	else
-//  	{
-//    	// for(cnt = 0;cnt < 50;cnt ++)
-//    	// {
-//    	// 	writeWord(adcbuff[cnt],1);
-//    	// }
-//  	}
+	/**** IO ZZZ or GND ****/
+
+	P2_0_SET_HIGH;//know = 10k
+	P2_1_SET_GND;//know = 1k
+	P2_2_SET_HIGH;//know = 100
+
+	/**** IO ZZZ or GND ****/
+
+//	测量电压部分
+ 	for(cnt = 0;cnt < 50;cnt++)
+ 	{
+ 		StartADCConvert();
+ 	}
+
+ 	for(cnt = 0;cnt < 50;cnt++)
+ 	{
+ 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
+ 		floatSum = floatSum + floatBuf;
+ 	}
+ 	floatSum = floatSum / 50.0;//模拟量平均值
+ 	PrintFloat(floatSum);
+ 	for(cnt = 0;cnt < 50;cnt++)
+	{
+		adcbuff[cnt] = 0;
+	}
+
+ 	if(P2_0_IS_GND)
+ 	{
+ 		R_know = 10000.0;
+ 	}
+ 	else if(P2_1_IS_GND)
+ 	{
+		R_know = 1000.0;
+ 	}
+ 	else if(P2_2_IS_GND)
+ 	{
+		R_know = 100.0;
+ 	}
+ 	else
+ 	{
+		R_know = 0.01;
+ 		PrintString("error");
+ 	}
+ 	dianzuzhi = (floatSum*R_know)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+ 	PrintString("the R value = ");
+ 	PrintFloat(dianzuzhi);
+ 	floatSum = 0;
+
+ 	__delay_cycles(8000000);
   }
 }
 #pragma vector = PORT1_VECTOR
