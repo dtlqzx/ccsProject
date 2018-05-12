@@ -234,7 +234,7 @@ void main()
 			adcbuff[cnt] = 0;
 		}
 		//计算待测电阻值
-		dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+		dianzuzhi = (floatSum*R_know)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
 		//计算待测电阻值  结束
 		//打印输出
 		PrintString("the R value = ");
@@ -250,7 +250,7 @@ void main()
 		PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
 		PrintFloat(Cvalue);
 		LCD_CValue(Cvalue);
-		__delay_cycles(1000000);
+		__delay_cycles(8000000);
 /****测量频率部分*******/
 
 //  	if(next == 1)
@@ -673,7 +673,7 @@ void LCD_CValue(float Cvalue)
 	const float Max10nFValue = 10.0;
 	const float Max100nFValue = 100.0;
 //	send Cvalue
-	uint8_t charbuff_nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','n','F','\0'};
+	uint8_t charbuff_nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','n','F','\0'};
 	uint8_t charbuff_10nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','n','F','\0'};
 	uint8_t charbuff_100nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','0','n','F','\0'};
 
