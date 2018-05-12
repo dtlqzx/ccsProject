@@ -136,6 +136,7 @@ uint8_t JudgeType(void);
 void initSPI_Soft(void);
 unsigned char writeByte(unsigned char data_8);
 uint16_t writeWord(uint16_t data_16,uint8_t channel);
+void LCD_RValue(float Rvalue);
 
 /********************************************
 
@@ -165,41 +166,26 @@ void main()
 	volatile float R_know = 0.01;
 	volatile float dianzuzhi = 0;
 	float floatVrms = 0;
+
+
+	/**打印学号**/
 	LCD_write_command(0x01);
 	LCD_stuNum();
 	LCD_stuNum();
 	__delay_cycles(LONGTIME);
 	LCD_write_command(0x01);
-
+	/**打印学号  结束**/
 
   while(1)
   {
-	/**** IO ZZZ or GND ****/
+	/**** 控制已知电阻 ****/
 
 	P2_0_SET_HIGH;//know = 10k
 	P2_1_SET_GND;//know = 1k
 	P2_2_SET_HIGH;//know = 100
 
-	/**** IO ZZZ or GND ****/
-
-//	测量电压部分
- 	for(cnt = 0;cnt < 50;cnt++)
- 	{
- 		StartADCConvert();
- 	}
-
- 	for(cnt = 0;cnt < 50;cnt++)
- 	{
- 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
- 		floatSum = floatSum + floatBuf;
- 	}
- 	floatSum = floatSum / 50.0;//模拟量平均值
- 	PrintFloat(floatSum);
- 	for(cnt = 0;cnt < 50;cnt++)
-	{
-		adcbuff[cnt] = 0;
-	}
-
+	/**** 控制已知电阻 结束****/
+ 	//选择已知电阻
  	if(P2_0_IS_GND)
  	{
  		R_know = 10000.0;
@@ -217,9 +203,34 @@ void main()
 		R_know = 0.01;
  		PrintString("error");
  	}
+ 	//选择已知电阻 结束
+
+//	测量电压部分
+ 	for(cnt = 0;cnt < 50;cnt++)
+ 	{
+ 		StartADCConvert();
+ 	}
+
+ 	for(cnt = 0;cnt < 50;cnt++)
+ 	{
+ 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
+ 		floatSum = floatSum + floatBuf;
+ 	}
+ 	floatSum = floatSum / 50.0;//模拟量平均值
+ 	PrintFloat(floatSum);
+//  测量电压部分 结束
+ 	for(cnt = 0;cnt < 50;cnt++)
+	{
+		adcbuff[cnt] = 0;
+	}
+ 	//计算待测电阻值
  	dianzuzhi = (floatSum*R_know)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+ 	//计算待测电阻值  结束
+ 	//打印输出
  	PrintString("the R value = ");
  	PrintFloat(dianzuzhi);
+ 	LCD_RValue(dianzuzhi);
+ 	//打印输出 结束
  	floatSum = 0;
 
  	__delay_cycles(8000000);
@@ -656,6 +667,46 @@ void LCD_Freq_Vrms(uint16_t freq,float vrms)
 	LCD_write_string(0,0,buff);
 	LCD_write_string(0,1,charbuff);
 }
+void LCD_RValue(float Rvalue)
+{
+	const float MaxOhmValue = 2000.0;
+//	send Rvalue
+	uint8_t charbuff_ohm[] = {'#','#','#','#','.','#','#','#',' ',' ','o','h','m','\0'};
+	uint8_t charbuff_kohm[] = {'#','#','#','#','.','#','#','#',' ',' ','k','o','h','m','\0'};
+
+	uint16_t interger = (uint16_t)Rvalue;
+	uint16_t pointNum = (uint16_t)((Rvalue - interger)*1000);
+	// ohm
+	charbuff_ohm[0] = interger / 1000 % 10 + '0';
+	charbuff_ohm[1] = interger / 100 % 10 + '0';
+	charbuff_ohm[2] = interger / 10 % 10 + '0';
+	charbuff_ohm[3] = interger / 1 % 10 + '0';
+	/***************************************/
+	charbuff_ohm[5] = pointNum / 100 % 10 + '0';
+	charbuff_ohm[6] = pointNum / 10 % 10 + '0';
+	charbuff_ohm[7] = pointNum / 1 % 10 + '0';
+	uint16_t interger_k = (uint16_t)(Rvalue/1000.0);
+	uint16_t pointNum_k = (uint16_t)((Rvalue/1000.0 - interger_k)*1000);
+
+	// kohm
+	charbuff_kohm[0] = interger_k / 1000 % 10 + '0';
+	charbuff_kohm[1] = interger_k / 100 % 10 + '0';
+	charbuff_kohm[2] = interger_k / 10 % 10 + '0';
+	charbuff_kohm[3] = interger_k / 1 % 10 + '0';
+	/***************************************/
+	charbuff_kohm[5] = pointNum_k / 100 % 10 + '0';
+	charbuff_kohm[6] = pointNum_k / 10 % 10 + '0';
+	charbuff_kohm[7] = pointNum_k / 1 % 10 + '0';
+
+	if(Rvalue >= MaxOhmValue)
+	{
+		LCD_write_string(0,1,charbuff_kohm);
+	}
+	else
+	{
+		LCD_write_string(0,1,charbuff_ohm);
+	}
+}
 uint8_t JudgeType(void)
 {
   uint8_t i = 0,j = 0;
@@ -944,6 +995,7 @@ void PrintFloat(float num)
 	PrintString(charbuff);
 
 }
+
 void Print_Type_Real_Full(uint8_t type, float real,float full)
 {
 	//Type
