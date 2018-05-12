@@ -47,8 +47,32 @@
 #define LCD_DATA    BIT7|BIT6|BIT5|BIT4   //4位数据线连接模式
 #define ADCBUFSIZE 50
 #define LONGTIME 40000000
+/************************IO part*******************/
+#define DIR2_0 P2DIR & BIT0
+#define DIR2_1 P2DIR & BIT1
+#define DIR2_2 P2DIR & BIT2
+#define OUT2_0 P2OUT & BIT0
+#define OUT2_1 P2OUT & BIT1
+#define OUT2_2 P2OUT & BIT2
 
-uint16_t adcbuff[50] = {0};
+#define P2_0_SET_HIGH P2DIR &= ~BIT0
+#define P2_1_SET_HIGH P2DIR &= ~BIT1
+#define P2_2_SET_HIGH P2DIR &= ~BIT2
+#define P2_0_SET_GND P2DIR |= BIT0; P2OUT &= ~BIT0;
+#define P2_1_SET_GND P2DIR |= BIT1; P2OUT &= ~BIT1;
+#define P2_2_SET_GND P2DIR |= BIT2; P2OUT &= ~BIT2;
+
+#define P2_0_IS_HIGH (~DIR2_0)
+#define P2_1_IS_HIGH (~DIR2_1)
+#define P2_2_IS_HIGH (~DIR2_2)
+#define P2_0_IS_GND (DIR2_0) && (~OUT2_0)
+#define P2_1_IS_GND (DIR2_1) && (~OUT2_1)
+#define P2_2_IS_GND (DIR2_2) && (~OUT2_2)
+
+
+
+/**************************************************/
+volatile uint16_t adcbuff[50] = {0};
 int16_t typeBuff[50] = {0};
 //uint16_t maxval[50] = {0};
 //uint16_t minval[50] = {0};
@@ -117,6 +141,7 @@ void initSPI_Soft(void);
 unsigned char writeByte(unsigned char data_8);
 uint16_t writeWord(uint16_t data_16,uint8_t channel);
 void LCD_CValue(float Cvalue);
+void LCD_RValue(float Rvalue);
 
 /********************************************
 
@@ -144,47 +169,89 @@ void main()
 	float floatBuf = 0;
 	float floatSum = 0;
 	float floatVrms = 0;
+	volatile float R_know = 0.01;
+	volatile float dianzuzhi = 0;
+
+
+
+	/**打印学号**/
 	LCD_write_command(0x01);
 	LCD_stuNum();
 	LCD_stuNum();
 	__delay_cycles(LONGTIME);
-measure:
+	measure:
 	LCD_write_command(0x01);
+	/**打印学号  结束**/
 
-
-// //	测量有效值部分
-//    LCD_write_command(0x01);
-//
-// 	for(cnt = 0;cnt < 50;cnt++)
-// 	{
-// 		StartADCConvert();
-// 	}
-// 	for(cnt = 0;cnt < 50;cnt++)
-// 	{
-// 		floatBuf = adcbuff[cnt]* 3300.0 / 1023.0;
-// 		floatSum = floatSum + floatBuf * floatBuf;
-// 	}
-// 	floatSum = floatSum / 50;
-// 	floatVrms = SqrtByNewton(floatSum);
-// 	floatSum = 0;
-//
-// 	delay_nms(100);
-// 	__delay_cycles(8000000);
-// 	LCD_Freq_Vrms(freq,floatVrms);
-// 	delay_nms(100);
-
-	// Print_Type_Real_Full(signalType,floatVrms,fvpp);
 
 	next = 0;
 	while(1)
 	{
+/****测电阻部分*****/
+		/**** 控制已知电阻 ****/
 
-	PrintFreq(freq);
-	Cvalue = 1000000.0*1.44/300.0/freq;
-	PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
-	PrintFloat(Cvalue);
-	LCD_CValue(Cvalue);
-	__delay_cycles(1000000);
+		P2_0_SET_GND;//know = 10k
+		P2_1_SET_HIGH;//know = 1k
+		P2_2_SET_HIGH;//know = 100
+
+		/**** 控制已知电阻 结束****/
+		//选择已知电阻
+		if(P2_0_IS_GND)
+		{
+			R_know = 10000.0;
+		}
+		else if(P2_1_IS_GND)
+		{
+			R_know = 1000.0;
+		}
+		else if(P2_2_IS_GND)
+		{
+			R_know = 100.0;
+		}
+		else
+		{
+			R_know = 0.01;
+			PrintString("error");
+		}
+		//选择已知电阻 结束
+
+		//	测量电压部分
+		for(cnt = 0;cnt < 50;cnt++)
+		{
+			StartADCConvert();
+		}
+
+		for(cnt = 0;cnt < 50;cnt++)
+		{
+			floatBuf = adcbuff[cnt]* 2.5 / 1023;
+			floatSum = floatSum + floatBuf;
+		}
+		floatSum = floatSum / 50.0;//模拟量平均值
+		PrintFloat(floatSum);
+		//  测量电压部分 结束
+		for(cnt = 0;cnt < 50;cnt++)
+		{
+			adcbuff[cnt] = 0;
+		}
+		//计算待测电阻值
+		dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+		//计算待测电阻值  结束
+		//打印输出
+		PrintString("the R value = ");
+		PrintFloat(dianzuzhi);
+		LCD_RValue(dianzuzhi);
+		//打印输出 结束
+		floatSum = 0;
+
+/****测电阻部分结束*****/
+/****测量频率部分*******/
+		PrintFreq(freq);
+		Cvalue = 1000000.0*1.44/300.0/freq;
+		PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
+		PrintFloat(Cvalue);
+		LCD_CValue(Cvalue);
+		__delay_cycles(1000000);
+/****测量频率部分*******/
 
 //  	if(next == 1)
 //  	{
@@ -659,6 +726,66 @@ void LCD_CValue(float Cvalue)
 	else
 	{
 		LCD_write_string(0,0,charbuff_nF);
+	}
+}
+void LCD_RValue(float Rvalue)
+{
+	const float MaxOhmValue = 2000.0;
+	const float MaxKohmValue = 20000.0;
+//	send Rvalue
+	uint8_t charbuff_ohm[] = {'#','#','#','#','.','#','#','#',' ',' ','o','h','m','\0'};
+	uint8_t charbuff_kohm[] = {'#','#','#','#','.','#','#','#',' ',' ','k','o','h','m','\0'};
+	uint8_t charbuff_10kohm[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','k','o','h','m','\0'};
+
+	uint16_t interger = (uint16_t)Rvalue;
+	uint16_t pointNum = (uint16_t)((Rvalue - interger)*1000);
+	// ohm
+	charbuff_ohm[0] = interger / 1000 % 10 + '0';
+	charbuff_ohm[1] = interger / 100 % 10 + '0';
+	charbuff_ohm[2] = interger / 10 % 10 + '0';
+	charbuff_ohm[3] = interger / 1 % 10 + '0';
+	/***************************************/
+	charbuff_ohm[5] = pointNum / 100 % 10 + '0';
+	charbuff_ohm[6] = pointNum / 10 % 10 + '0';
+	charbuff_ohm[7] = pointNum / 1 % 10 + '0';
+
+	uint16_t interger_k = (uint16_t)(Rvalue/1000.0);
+	uint16_t pointNum_k = (uint16_t)((Rvalue/1000.0 - interger_k)*1000);
+
+	// kohm
+	charbuff_kohm[0] = interger_k / 1000 % 10 + '0';
+	charbuff_kohm[1] = interger_k / 100 % 10 + '0';
+	charbuff_kohm[2] = interger_k / 10 % 10 + '0';
+	charbuff_kohm[3] = interger_k / 1 % 10 + '0';
+	/***************************************/
+	charbuff_kohm[5] = pointNum_k / 100 % 10 + '0';
+	charbuff_kohm[6] = pointNum_k / 10 % 10 + '0';
+	charbuff_kohm[7] = pointNum_k / 1 % 10 + '0';
+
+	uint16_t interger_10k = (uint16_t)(Rvalue/10000.0);
+	uint16_t pointNum_10k = (uint16_t)((Rvalue/10000.0 - interger_10k)*1000);
+
+	// 10kohm
+	charbuff_10kohm[0] = interger_10k / 1000 % 10 + '0';
+	charbuff_10kohm[1] = interger_10k / 100 % 10 + '0';
+	charbuff_10kohm[2] = interger_10k / 10 % 10 + '0';
+	charbuff_10kohm[3] = interger_10k / 1 % 10 + '0';
+	/***************************************/
+	charbuff_10kohm[5] = pointNum_10k / 100 % 10 + '0';
+	charbuff_10kohm[6] = pointNum_10k / 10 % 10 + '0';
+	charbuff_10kohm[7] = pointNum_10k / 1 % 10 + '0';
+
+	if(Rvalue >= MaxKohmValue)
+	{
+		LCD_write_string(0,1,charbuff_10kohm);
+	}
+	else if(Rvalue >= MaxOhmValue)
+	{
+		LCD_write_string(0,1,charbuff_kohm);
+	}
+	else
+	{
+		LCD_write_string(0,1,charbuff_ohm);
 	}
 }
 void LCD_Freq_Vrms(uint16_t freq,float vrms)

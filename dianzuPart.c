@@ -178,62 +178,62 @@ void main()
 
   while(1)
   {
-	/**** 控制已知电阻 ****/
+		/**** 控制已知电阻 ****/
 
-	P2_0_SET_GND;//know = 10k
-	P2_1_SET_HIGH;//know = 1k
-	P2_2_SET_HIGH;//know = 100
+		P2_0_SET_GND;//know = 10k
+		P2_1_SET_HIGH;//know = 1k
+		P2_2_SET_HIGH;//know = 100
 
-	/**** 控制已知电阻 结束****/
- 	//选择已知电阻
- 	if(P2_0_IS_GND)
- 	{
- 		R_know = 10000.0;
- 	}
- 	else if(P2_1_IS_GND)
- 	{
-		R_know = 1000.0;
- 	}
- 	else if(P2_2_IS_GND)
- 	{
-		R_know = 100.0;
- 	}
- 	else
- 	{
-		R_know = 0.01;
- 		PrintString("error");
- 	}
- 	//选择已知电阻 结束
+		/**** 控制已知电阻 结束****/
+	 	//选择已知电阻
+	 	if(P2_0_IS_GND)
+	 	{
+	 		R_know = 10000.0;
+	 	}
+	 	else if(P2_1_IS_GND)
+	 	{
+			R_know = 1000.0;
+	 	}
+	 	else if(P2_2_IS_GND)
+	 	{
+			R_know = 100.0;
+	 	}
+	 	else
+	 	{
+			R_know = 0.01;
+	 		PrintString("error");
+	 	}
+	 	//选择已知电阻 结束
 
-//	测量电压部分
- 	for(cnt = 0;cnt < 50;cnt++)
- 	{
- 		StartADCConvert();
- 	}
+	//	测量电压部分
+	 	for(cnt = 0;cnt < 50;cnt++)
+	 	{
+	 		StartADCConvert();
+	 	}
 
- 	for(cnt = 0;cnt < 50;cnt++)
- 	{
- 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
- 		floatSum = floatSum + floatBuf;
- 	}
- 	floatSum = floatSum / 50.0;//模拟量平均值
- 	PrintFloat(floatSum);
-//  测量电压部分 结束
- 	for(cnt = 0;cnt < 50;cnt++)
-	{
-		adcbuff[cnt] = 0;
-	}
- 	//计算待测电阻值
- 	dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
- 	//计算待测电阻值  结束
- 	//打印输出
- 	PrintString("the R value = ");
- 	PrintFloat(dianzuzhi);
- 	LCD_RValue(dianzuzhi);
- 	//打印输出 结束
- 	floatSum = 0;
+	 	for(cnt = 0;cnt < 50;cnt++)
+	 	{
+	 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
+	 		floatSum = floatSum + floatBuf;
+	 	}
+	 	floatSum = floatSum / 50.0;//模拟量平均值
+	 	PrintFloat(floatSum);
+	//  测量电压部分 结束
+	 	for(cnt = 0;cnt < 50;cnt++)
+		{
+			adcbuff[cnt] = 0;
+		}
+	 	//计算待测电阻值
+	 	dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+	 	//计算待测电阻值  结束
+	 	//打印输出
+	 	PrintString("the R value = ");
+	 	PrintFloat(dianzuzhi);
+	 	LCD_RValue(dianzuzhi);
+	 	//打印输出 结束
+	 	floatSum = 0;
 
- 	__delay_cycles(8000000);
+	 	__delay_cycles(8000000);
   }
 }
 #pragma vector = PORT1_VECTOR
