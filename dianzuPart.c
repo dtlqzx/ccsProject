@@ -180,8 +180,8 @@ void main()
   {
 	/**** 控制已知电阻 ****/
 
-	P2_0_SET_HIGH;//know = 10k
-	P2_1_SET_GND;//know = 1k
+	P2_0_SET_GND;//know = 10k
+	P2_1_SET_HIGH;//know = 1k
 	P2_2_SET_HIGH;//know = 100
 
 	/**** 控制已知电阻 结束****/
@@ -224,7 +224,7 @@ void main()
 		adcbuff[cnt] = 0;
 	}
  	//计算待测电阻值
- 	dianzuzhi = (floatSum*R_know)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
+ 	dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
  	//计算待测电阻值  结束
  	//打印输出
  	PrintString("the R value = ");
@@ -670,9 +670,11 @@ void LCD_Freq_Vrms(uint16_t freq,float vrms)
 void LCD_RValue(float Rvalue)
 {
 	const float MaxOhmValue = 2000.0;
+	const float MaxKohmValue = 20000.0;
 //	send Rvalue
 	uint8_t charbuff_ohm[] = {'#','#','#','#','.','#','#','#',' ',' ','o','h','m','\0'};
 	uint8_t charbuff_kohm[] = {'#','#','#','#','.','#','#','#',' ',' ','k','o','h','m','\0'};
+	uint8_t charbuff_10kohm[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','k','o','h','m','\0'};
 
 	uint16_t interger = (uint16_t)Rvalue;
 	uint16_t pointNum = (uint16_t)((Rvalue - interger)*1000);
@@ -685,6 +687,7 @@ void LCD_RValue(float Rvalue)
 	charbuff_ohm[5] = pointNum / 100 % 10 + '0';
 	charbuff_ohm[6] = pointNum / 10 % 10 + '0';
 	charbuff_ohm[7] = pointNum / 1 % 10 + '0';
+
 	uint16_t interger_k = (uint16_t)(Rvalue/1000.0);
 	uint16_t pointNum_k = (uint16_t)((Rvalue/1000.0 - interger_k)*1000);
 
@@ -698,7 +701,24 @@ void LCD_RValue(float Rvalue)
 	charbuff_kohm[6] = pointNum_k / 10 % 10 + '0';
 	charbuff_kohm[7] = pointNum_k / 1 % 10 + '0';
 
-	if(Rvalue >= MaxOhmValue)
+	uint16_t interger_10k = (uint16_t)(Rvalue/10000.0);
+	uint16_t pointNum_10k = (uint16_t)((Rvalue/10000.0 - interger_10k)*1000);
+
+	// 10kohm
+	charbuff_10kohm[0] = interger_10k / 1000 % 10 + '0';
+	charbuff_10kohm[1] = interger_10k / 100 % 10 + '0';
+	charbuff_10kohm[2] = interger_10k / 10 % 10 + '0';
+	charbuff_10kohm[3] = interger_10k / 1 % 10 + '0';
+	/***************************************/
+	charbuff_10kohm[5] = pointNum_10k / 100 % 10 + '0';
+	charbuff_10kohm[6] = pointNum_10k / 10 % 10 + '0';
+	charbuff_10kohm[7] = pointNum_10k / 1 % 10 + '0';
+
+	if(Rvalue >= MaxKohmValue)
+	{
+		LCD_write_string(0,1,charbuff_10kohm);
+	}
+	else if(Rvalue >= MaxOhmValue)
 	{
 		LCD_write_string(0,1,charbuff_kohm);
 	}
