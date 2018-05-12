@@ -106,7 +106,6 @@ void IniButton(void);
 void IniADC();
 void IniUART(void);
 void IniTimerA1_ct();
-void SpiWriteDAC(uint16_t data,uint8_t channel);
 
 uint16_t GetADCValue(void);
 void StartADCConvert(void);
@@ -138,7 +137,6 @@ void LCD_stuNum(void);
 void LCD_Type_Vpp(char* type,float vpp);
 void LCD_Freq_Vrms(uint16_t freq,float vrms);
 
-uint8_t JudgeType(void);
 
 void initSPI_Soft(void);
 unsigned char writeByte(unsigned char data_8);
@@ -167,13 +165,10 @@ void main()
     __bis_SR_register(GIE);
 
 	volatile float dianzuzhi = 0;
-	uint16_t data = 12;
-	float voltage = 3.1;
-	uint8_t cnt = 0,cnt1 = 0;
+	uint8_t cnt = 0;
 	volatile float fvpp = 0.0f;
 	float floatBuf = 0;
 	float floatSum = 0;
-	float floatVrms = 0;
 	volatile float R_know = 0.01;
 
 
@@ -183,7 +178,6 @@ void main()
 	LCD_stuNum();
 	LCD_stuNum();
 	__delay_cycles(LONGTIME);
-	measure:
 	LCD_write_command(0x01);
 	/**打印学号  结束**/
 
@@ -298,18 +292,6 @@ void main()
 		LCD_CValue(Cvalue);
 		__delay_cycles(8000000);
 /****测量电容部分*******/
-
-//  	if(next == 1)
-//  	{
-//  	   goto measure;
-//  	}
-//  	else
-//  	{
-//    	// for(cnt = 0;cnt < 50;cnt ++)
-//    	// {
-//    	// 	writeWord(adcbuff[cnt],1);
-//    	// }
-//  	}
 	}
 }
 #pragma vector = PORT1_VECTOR
@@ -447,27 +429,6 @@ void IniTimerA1_ct()
     P2SEL |= BIT5;
     /*允许捕捉比较中断*/
     TA1CCTL2 |= CCIE;
-}
-void SpiWriteDAC(uint16_t data,uint8_t channel)
-{
-	data &= ~0xf000;
-	if(channel == 0)
-	{
-		data |= 0xC000;//高4位 1100	A channel
-	}
-	else
-	{
-		data |= 0x4000;//高4位 0100	B channel
-	}
-	uint8_t high = (uint8_t)(data >> 8);
-	uint8_t low  = (uint8_t)(data & 0x00ff);
-	P1OUT &= ~BIT5;
-
-	SpiBusWrite(high);
-	SpiBusWrite(low);
-
-	P1OUT |= BIT5;
-
 }
 /********************************************
 
@@ -924,73 +885,6 @@ void LCD_Freq_Vrms(uint16_t freq,float vrms)
 
 	LCD_write_string(0,0,buff);
 	LCD_write_string(0,1,charbuff);
-}
-uint8_t JudgeType(void)
-{
-  uint8_t i = 0,j = 0;
-  int16_t buf1 = 0, buf2 = 0;
-  int16_t adcDivBuf = 0;
-  volatile uint8_t debug = 0;
-  const uint8_t charbuf1[] = {'s','q','u','a','r','e','\0'};
-  const uint8_t charbuf2[] = {'t','r','i','a','n','g','l','e','\0'};
-  const uint8_t charbuf3[] = {'S','i','n','\0'};
-  for (i = 0; i < ADCBUFSIZE; i++)
-  {
-    StartADCConvert();
-  }
-  for (i = 0; i < ADCBUFSIZE - 1; i++)
-  {
-	buf1 = adcbuff[i];buf2 = adcbuff[i + 1];
-	adcDivBuf = buf1 - buf2;
-	typeBuff[i] = adcDivBuf;
-    if(adcDivBuf < low && adcDivBuf > -low)
-    {
-      lowNum++;
-    }
-    else
-    {
-      highNum++;
-    }
-  }
-  if(debug == 0)
-  {debug = 1;}
-  if(lowNum >= 30)
-  {
-    //square
-	lowNum = 0; highNum = 0;
-//    PrintString("square");
-    return 1;
-  }
-  else
-  {
-    lowNum = 0; highNum = 0;
-    for (i = 0; i < ADCBUFSIZE - 1; i++)
-    {
-      adcDivBuf = typeBuff[i] - typeBuff[i + 1];
-      typeBuff[i] = adcDivBuf;
-      if(adcDivBuf < mid && adcDivBuf > -mid)
-      {
-        lowNum++;
-      }
-      else
-      {
-        highNum++;
-      }
-    }
-    if(lowNum >= 20)
-    {
-      //Triangle
-//      PrintString("Triangle");
-      return 2;
-
-    }
-    else
-    {
-      //Sin
-//      PrintString("Sin");
-      return 3;
-    }
-  }
 }
 void initSPI_Soft(void)
 {
