@@ -447,23 +447,6 @@ void IniTimerA1_ct()
     P2SEL |= BIT5;
     /*允许捕捉比较中断*/
     TA1CCTL2 |= CCIE;
-
-    /*设置时钟源为SMCLK*/
-    TA0CTL |= TASSEL1;
-    /*设置工作模式为Up&Down*/
-    TA0CTL |= MC0|MC1;
-    /*设置TA0CCR0为0x00FF*/
-    TA0CCR0 = 0x0AAA;
-    /*设置TA0CCR1为0x00FF*/
-    TA0CCR1 = 0x0555;//占空比(TACCR0 - TACCR1) / TACCR0,频率=SMCLK/(TACCR0)/2
-    /*设置为比较模式*/
-    TA0CCTL0 &= ~CAP;
-    TA0CCTL1 &= ~CAP;
-    /*设置比较输出模式*/
-    TA0CCTL1 |= OUTMOD_6;
-		/*设置IO复用*/
-		P1SEL |= BIT6;
-		P1DIR |= BIT6;
 }
 void SpiWriteDAC(uint16_t data,uint8_t channel)
 {
