@@ -650,15 +650,15 @@ void LCD_CValue(float Cvalue)
 
 	if(Cvalue >= Max100nFValue)
 	{
-		LCD_write_string(0,1,charbuff_100nF);
+		LCD_write_string(0,0,charbuff_100nF);
 	}
 	else if(Cvalue >= Max10nFValue)
 	{
-		LCD_write_string(0,1,charbuff_10nF);
+		LCD_write_string(0,0,charbuff_10nF);
 	}
 	else
 	{
-		LCD_write_string(0,1,charbuff_nF);
+		LCD_write_string(0,0,charbuff_nF);
 	}
 }
 void LCD_Freq_Vrms(uint16_t freq,float vrms)
