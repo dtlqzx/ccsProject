@@ -180,8 +180,8 @@ measure:
 	{
 
 	PrintFreq(freq);
-	Cvalue = 1000000.0*1.44/300000.0/freq;
-	PrintString("\nCvalue = ");//乘1000000，代表电容单位是微法拉
+	Cvalue = 1000000.0*1.44/300.0/freq;
+	PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
 	PrintFloat(Cvalue);
 	LCD_CValue(Cvalue);
 	__delay_cycles(1000000);
@@ -603,8 +603,8 @@ void LCD_Type_Vpp(char* type,float vpp)
 }
 void LCD_CValue(float Cvalue)
 {
-	const float MaxnFValue = 2000.0;
-	const float Max10nFValue = 20000.0;
+	const float Max10nFValue = 10.0;
+	const float Max100nFValue = 100.0;
 //	send Cvalue
 	uint8_t charbuff_nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','n','F','\0'};
 	uint8_t charbuff_10nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','n','F','\0'};
@@ -648,17 +648,17 @@ void LCD_CValue(float Cvalue)
 	charbuff_100nF[6] = pointNum_100 / 10 % 10 + '0';
 	charbuff_100nF[7] = pointNum_100 / 1 % 10 + '0';
 
-	if(Cvalue >= Max10nFValue)
+	if(Cvalue >= Max100nFValue)
 	{
-		LCD_write_string(0,1,charbuff_nF);
+		LCD_write_string(0,0,charbuff_100nF);
 	}
-	else if(Cvalue >= MaxnFValue)
+	else if(Cvalue >= Max10nFValue)
 	{
-		LCD_write_string(0,1,charbuff_10nF);
+		LCD_write_string(0,0,charbuff_10nF);
 	}
 	else
 	{
-		LCD_write_string(0,1,charbuff_100nF);
+		LCD_write_string(0,0,charbuff_nF);
 	}
 }
 void LCD_Freq_Vrms(uint16_t freq,float vrms)
