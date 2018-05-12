@@ -40,12 +40,12 @@
 #define ADCBUFSIZE 50
 #define LONGTIME 40000000
 /************************IO part*******************/
-#define DIR2_0 P2DIR & BIT0
-#define DIR2_1 P2DIR & BIT1
-#define DIR2_2 P2DIR & BIT2
-#define OUT2_0 P2OUT & BIT0
-#define OUT2_1 P2OUT & BIT1
-#define OUT2_2 P2OUT & BIT2
+#define DIR2_0 (P2DIR & BIT0)
+#define DIR2_1 (P2DIR & BIT1)
+#define DIR2_2 (P2DIR & BIT2)
+#define OUT2_0 (P2OUT & BIT0)
+#define OUT2_1 (P2OUT & BIT1)
+#define OUT2_2 (P2OUT & BIT2)
 
 #define P2_0_SET_HIGH P2DIR &= ~BIT0
 #define P2_1_SET_HIGH P2DIR &= ~BIT1
@@ -57,9 +57,9 @@
 #define P2_0_IS_HIGH (~DIR2_0)
 #define P2_1_IS_HIGH (~DIR2_1)
 #define P2_2_IS_HIGH (~DIR2_2)
-#define P2_0_IS_GND (DIR2_0) && (~OUT2_0)
-#define P2_1_IS_GND (DIR2_1) && (~OUT2_1)
-#define P2_2_IS_GND (DIR2_2) && (~OUT2_2)
+#define P2_0_IS_GND ((DIR2_0) && (~OUT2_0))
+#define P2_1_IS_GND ((DIR2_1) && (~OUT2_1))
+#define P2_2_IS_GND ((DIR2_2) && (~OUT2_2))
 
 /******************display part************************/
 #define SMALLRANGE
@@ -81,9 +81,15 @@ float freq = 0;
 uint16_t freqCnt = 0;
 uint16_t T = 0;
 const uint16_t t_1s = 20;
+uint32_t timestamp = 0;//时间戳
+uint16_t capvalue_1 = 0;//第一次捕捉值
+uint16_t capvalue_2 = 0;//第二次捕捉值
+uint32_t timestamp_1 = 0;//第一次时间戳
+uint32_t timestamp_2 = 0;//第二次时间戳
+uint32_t totaltime = 0;
 
 //输出部分变量
-volatile uint8_t displayStatus = 0;
+volatile uint8_t displayStatus = 3;
 //表达电容部分变量
 volatile float Cvalue = 0;
 
@@ -139,6 +145,7 @@ unsigned char writeByte(unsigned char data_8);
 uint16_t writeWord(uint16_t data_16,uint8_t channel);
 void LCD_CValue(float Cvalue);
 void LCD_RValue(float Rvalue);
+void suit(float RValue);
 
 /********************************************
 
@@ -146,6 +153,7 @@ void LCD_RValue(float Rvalue);
 
 *******************************************/
 
+	volatile float dianzuzhi = 0;
 void main()
 {
 	WDTCTL = WDTPW + WDTHOLD;     // 关闭看门狗
@@ -167,7 +175,6 @@ void main()
 	float floatSum = 0;
 	float floatVrms = 0;
 	volatile float R_know = 0.01;
-	volatile float dianzuzhi = 0;
 
 
 
@@ -186,10 +193,47 @@ void main()
 	{
 /****测电阻部分*****/
 		/**** 控制已知电阻 ****/
-
-		P2_0_SET_GND;//know = 10k
+		/**** initial for state 3 ***/
+		P2_0_SET_HIGH;//know = 10k
 		P2_1_SET_HIGH;//know = 1k
-		P2_2_SET_HIGH;//know = 100
+		P2_2_SET_GND;//know = 100
+		/**** initial for state 3 结束***/
+		switch(displayStatus)
+		{
+			case 0:
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_HIGH;//know = 1k
+				P2_2_SET_GND;//know = 100
+				break;
+			}
+			case 1:
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_GND;//know = 1k
+				P2_2_SET_HIGH;//know = 100
+				break;
+			}
+			case 2:
+			{
+				P2_0_SET_GND;//know = 10k
+				P2_1_SET_HIGH;//know = 1k
+				P2_2_SET_HIGH;//know = 100
+				break;
+			}
+			case 3:
+			{
+				break;
+			}
+			default:
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_HIGH;//know = 1k
+				P2_2_SET_GND;//know = 100
+				break;
+			}
+
+		};
 
 		/**** 控制已知电阻 结束****/
 		//选择已知电阻
@@ -231,8 +275,12 @@ void main()
 			adcbuff[cnt] = 0;
 		}
 		//计算待测电阻值
-		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
+//		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
 		//计算待测电阻值  结束
+		if(displayStatus == 3)
+		{
+			suit(dianzuzhi);
+		}
 		//打印输出
 		PrintString("the R value = ");
 		PrintFloat(dianzuzhi);
@@ -242,8 +290,9 @@ void main()
 
 /****测电阻部分结束*****/
 /****测量电容部分*******/
+    	freq = (float)(8000000.0) / totaltime;
 		PrintFreq(freq);
-		Cvalue = 1000000.0*1.44/300.0/freq;
+		Cvalue = 1000000.0*1.44/360.0/freq;
 		PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
 		PrintFloat(Cvalue);
 		LCD_CValue(Cvalue);
@@ -269,33 +318,39 @@ __interrupt void Port1_ISR(void)
 	if(P1IFG & BIT3)//判断是否是P1.3产生中断
 	{
 		P1IFG &= ~BIT3;
-		next = 1;
+		displayStatus = (displayStatus + 1) % 4;
 	}
 }
 
 #pragma vector = TIMER1_A1_VECTOR
 __interrupt void Time_Tick(void)
 {
-  __bis_SR_register(GIE);//允许中断嵌套
+	static uint8_t cnt = 0;
+	__bis_SR_register(GIE);//允许中断嵌套
 	switch(TA1IV)
 	{
-	case 0x02:break;
-	case 0x04:
-		freqCnt++;
+	case 0x02://捕捉比较中断1
 		break;
-	case 0x0A:
-		if(T >= t_1s)
+	case 0x04://捕捉比较中断2
+		if(cnt == 0)
 		{
-			T = 0;
-			freq = (float)freqCnt;
-			freqCnt = 0;
+			capvalue_1 = TA1CCR2;//保存第一次捕捉值
+			timestamp_1 = timestamp;//保存第一次时间戳
+			cnt ++;
 		}
 		else
 		{
-			T++;
+			capvalue_2 = TA1CCR2;//保存第二次捕捉值
+			timestamp_2 = timestamp;//保存第二次时间戳
+			cnt = 0;
+			totaltime = (timestamp_2 - timestamp_1) * 50000 + capvalue_2 - capvalue_1;//计算总时间
 		}
 		break;
-	default:break;
+	case 0x0A://溢出中断
+		timestamp ++;
+		break;
+	default:
+		break;
 	}
 }
 /*
@@ -374,20 +429,38 @@ void IniUART(void)
 }
 void IniTimerA1_ct()
 {
-	TA1CTL |= TASSEL_2;
-	TA1CTL |= MC_1;
-	TA1CTL |= ID_3;
-	TA1CCR0 = 47730;//50000 * 1us * 20 = 1s
-	/***定时器A1溢出中断***/
-	TA1CTL |= TAIE;
-	//将捕捉时计数值存入TA1CCR2
-	TA1CCTL2 |= CAP;
-	TA1CCTL2 |= CM_1;
-	TA1CCTL2 |= CCIS_1;//输入选择B通道
-	//IO定时器输入复用
-	P2SEL |= BIT5;
-	P2DIR &= ~BIT5;
-	TA1CCTL2 |= CCIE;//允许捕捉中断(CCIFG的)
+    /*设置时钟源为SMCLK*/
+    TA1CTL |= TASSEL_2;
+    /*设置工作模式为Up Mode*/
+    TA1CTL |= MC_1;
+    /*设置定时间隔*/
+    TA1CCR0 = 49999;//50ms
+    /*开启TAIFG中断*/
+    TA1CTL |= TAIE;
+
+    /*TA1,CCR2用于捕捉功能*/
+    TA1CCTL2 |= CAP;
+    /*上升沿捕捉*/
+    TA1CCTL2 |= CM0;
+    /*P2.5作为捕捉输入(CCI2B)*/
+    TA1CCTL2 |= CCIS0;
+    P2SEL |= BIT5;
+    /*允许捕捉比较中断*/
+    TA1CCTL2 |= CCIE;
+
+    /*设置时钟源为SMCLK*/
+    TA0CTL |= TASSEL1;
+    /*设置工作模式为Up&Down*/
+    TA0CTL |= MC0|MC1;
+    /*设置TA0CCR0为0x00FF*/
+    TA0CCR0 = 0x0AAA;
+    /*设置TA0CCR1为0x00FF*/
+    TA0CCR1 = 0x0555;//占空比(TACCR0 - TACCR1) / TACCR0,频率=SMCLK/(TACCR0)/2
+    /*设置为比较模式*/
+    TA0CCTL0 &= ~CAP;
+    TA0CCTL1 &= ~CAP;
+    /*设置比较输出模式*/
+    TA0CCTL1 |= OUTMOD_6;
 }
 void SpiWriteDAC(uint16_t data,uint8_t channel)
 {
@@ -772,18 +845,46 @@ void LCD_RValue(float Rvalue)
 	charbuff_10kohm[6] = pointNum_10k / 10 % 10 + '0';
 	charbuff_10kohm[7] = pointNum_10k / 1 % 10 + '0';
 
-	if(Rvalue >= MaxKohmValue)
+	switch(displayStatus)
 	{
-		LCD_write_string(0,1,charbuff_10kohm);
+		case 0:
+		{
+			LCD_write_string(0,1,charbuff_ohm);
+			break;
+		}
+		case 1:
+		{
+			LCD_write_string(0,1,charbuff_kohm);
+			break;
+		}
+		case 2:
+		{
+			LCD_write_string(0,1,charbuff_10kohm);
+			break;
+		}
+		case 3:
+		{
+			if(Rvalue >= MaxKohmValue)
+			{
+				LCD_write_string(0,1,charbuff_10kohm);
+			}
+			else if(Rvalue >= MaxOhmValue)
+			{
+				LCD_write_string(0,1,charbuff_kohm);
+			}
+			else
+			{
+				LCD_write_string(0,1,charbuff_ohm);
+			}
+			break;
+		}
+		default:
+		{
+			LCD_write_string(0,1,charbuff_kohm);
+			break;
+		}
 	}
-	else if(Rvalue >= MaxOhmValue)
-	{
-		LCD_write_string(0,1,charbuff_kohm);
-	}
-	else
-	{
-		LCD_write_string(0,1,charbuff_ohm);
-	}
+
 }
 void LCD_Freq_Vrms(uint16_t freq,float vrms)
 {
@@ -1118,4 +1219,91 @@ void Print_Type_Real_Full(uint8_t type, float real,float full)
 	PrintFloat(real);
 	PrintString("Full Voltage(mV):");
 	PrintFloat(full);
+}
+void suit(float RValue)
+{
+	const float MaxOhmValue = 2000.0;
+	const float MaxKohmValue = 20000.0;
+
+	volatile uint8_t levelSuit = 0;
+
+	volatile uint8_t levelLowSuit = 0;
+	volatile uint8_t levelMidSuit = 0;
+	volatile uint8_t levelHighSuit = 0;
+	levelLowSuit = RValue < MaxOhmValue && P2_2_IS_GND;
+	levelMidSuit = RValue >= MaxOhmValue && RValue < MaxKohmValue && P2_1_IS_GND;
+	levelHighSuit = RValue >= MaxKohmValue && P2_0_IS_GND;
+
+	levelSuit = levelLowSuit || levelMidSuit || levelHighSuit;
+	volatile uint8_t levelLess = 0;
+
+	volatile uint8_t levelLowLess = 0;
+	volatile uint8_t levelMidLess = 0;
+	volatile uint8_t levelHighLess = 0;
+	levelLowLess = 0;
+	levelMidLess = RValue >= MaxOhmValue && RValue < MaxKohmValue && P2_2_IS_GND;
+	levelHighLess = RValue >= MaxKohmValue && (!P2_0_IS_GND);
+
+	levelLess = levelLowLess || levelMidLess || levelHighLess;
+
+	volatile uint8_t levelHigh = 0;
+
+	volatile uint8_t levelLowHigh = 0;
+	volatile uint8_t levelMidHigh = 0;
+	volatile uint8_t levelHighHigh = 0;
+
+	levelLowHigh = RValue < MaxOhmValue && (!P2_2_IS_GND);
+	levelMidHigh = RValue >= MaxOhmValue && RValue < MaxKohmValue && P2_0_IS_GND;
+	levelHighHigh = 0;
+
+	levelHigh = levelLowHigh || levelMidHigh || levelHighHigh;
+
+
+	if(levelSuit)
+	{
+		//do nothing
+	}
+	else
+	{
+		if(levelLess)
+		{
+			//level up
+			if(P2_2_IS_GND)
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_GND;//know = 1k
+				P2_2_SET_HIGH;//know = 100
+			}
+			else if(P2_1_IS_GND)
+			{
+				P2_0_SET_GND;//know = 10k
+				P2_1_SET_HIGH;//know = 1k
+				P2_2_SET_HIGH;//know = 100
+			}
+			else
+			{
+				//do nothing
+			}
+		}
+		else
+		{
+			//level down
+			if(P2_0_IS_GND)
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_GND;//know = 1k
+				P2_2_SET_HIGH;//know = 100
+			}
+			else if(P2_1_IS_GND)
+			{
+				P2_0_SET_HIGH;//know = 10k
+				P2_1_SET_HIGH;//know = 1k
+				P2_2_SET_GND;//know = 100
+			}
+			else
+			{
+				//do nothing
+			}
+		}
+	}
 }
