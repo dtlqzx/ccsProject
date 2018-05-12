@@ -1,26 +1,18 @@
 /*********************************************************************
-*reWrite 可以成功让屏幕显示学号，自己随便写的 波形类型 Vpp值（float）, adc测得的直接数字量(uint16_t)
-*多写了一个可以输出LCD_Freq_Vrms的函数
-*新增测量有效值并输出功能，不过测量值似乎有一些误差
-*新增判断类型功能，可以准确判断信号源 8kHz的3种波形类型   待确定参数  lowNum >= 20 中的这个20应该还有更佳的取值
-*一
-*const int low = 50,mid = 200,high = 300;
-*20  9k 以上的 三角和正弦都会被识别为方波
-*
-*二
-*const int low = 5,mid = 200,high = 300;
-*lowNum >= 20
-*正弦有 5 个 100Hz 频率点会错 其余正确
-*三角有 5 个 100Hz 频率点会错 其余正确
+*P2.0,P2.1,P2.2--控制电阻高阻、接地
+*P2.0--控制 10k ohm
+*P2.1--控制 1k  ohm
+*P2.2--控制 100 ohm
+*P1.0--ADC采样--测电阻
+*P2.5--Timer测频--测电容
+*P1.4,P1.5,P1.6,P1.7,XIN(P2.6),XOUT(P2.7),GND---控制LCD1602
 *
 *
 *
-*新增：已经把所有功能做到了一起，包括第四条UART通信。
-*UART 发送没问题
-*显示学号没问题
-*测频基本没问题，需调整与其他代码间延时
-*测峰峰值和有效值功能基本正确，但值有一定误差，待改进
-*测类型需与实际电路板联测确定参数，目前基本能辨别信号源
+*
+*
+*
+*
 *
 *****************************************************************/
 
@@ -69,9 +61,12 @@
 #define P2_1_IS_GND (DIR2_1) && (~OUT2_1)
 #define P2_2_IS_GND (DIR2_2) && (~OUT2_2)
 
+/******************display part************************/
+#define SMALLRANGE
 
+/******************全局变量部分*****************************/
 
-/**************************************************/
+//测电压部分变量
 volatile uint16_t adcbuff[50] = {0};
 int16_t typeBuff[50] = {0};
 //uint16_t maxval[50] = {0};
@@ -87,7 +82,13 @@ uint16_t freqCnt = 0;
 uint16_t T = 0;
 const uint16_t t_1s = 20;
 
+//输出部分变量
+volatile uint8_t displayStatus = 0;
+//表达电容部分变量
+volatile float Cvalue = 0;
 
+
+//判断部分变量
 const int low = 5,mid = 10,high = 300;
 uint8_t lowNum = 0,midNum = 0,highNum = 0;
 
@@ -136,6 +137,7 @@ uint8_t JudgeType(void);
 void initSPI_Soft(void);
 unsigned char writeByte(unsigned char data_8);
 uint16_t writeWord(uint16_t data_16,uint8_t channel);
+void LCD_CValue(float Cvalue);
 void LCD_RValue(float Rvalue);
 
 /********************************************
@@ -154,18 +156,19 @@ void main()
 	LCD_init();
 	IniADC();
 	IniButton();
-//	initSPI_Soft();
+	initSPI_Soft();
     __bis_SR_register(GIE);
 
 	uint16_t data = 12;
 	float voltage = 3.1;
 	uint8_t cnt = 0,cnt1 = 0;
 	volatile float fvpp = 0.0f;
-	volatile float floatBuf = 0;
-	volatile float floatSum = 0;
+	float floatBuf = 0;
+	float floatSum = 0;
+	float floatVrms = 0;
 	volatile float R_know = 0.01;
 	volatile float dianzuzhi = 0;
-	float floatVrms = 0;
+
 
 
 	/**打印学号**/
@@ -173,11 +176,15 @@ void main()
 	LCD_stuNum();
 	LCD_stuNum();
 	__delay_cycles(LONGTIME);
+	measure:
 	LCD_write_command(0x01);
 	/**打印学号  结束**/
 
-  while(1)
-  {
+
+	next = 0;
+	while(1)
+	{
+/****测电阻部分*****/
 		/**** 控制已知电阻 ****/
 
 		P2_0_SET_GND;//know = 10k
@@ -185,56 +192,76 @@ void main()
 		P2_2_SET_HIGH;//know = 100
 
 		/**** 控制已知电阻 结束****/
-	 	//选择已知电阻
-	 	if(P2_0_IS_GND)
-	 	{
-	 		R_know = 10000.0;
-	 	}
-	 	else if(P2_1_IS_GND)
-	 	{
+		//选择已知电阻
+		if(P2_0_IS_GND)
+		{
+			R_know = 10000.0;
+		}
+		else if(P2_1_IS_GND)
+		{
 			R_know = 1000.0;
-	 	}
-	 	else if(P2_2_IS_GND)
-	 	{
+		}
+		else if(P2_2_IS_GND)
+		{
 			R_know = 100.0;
-	 	}
-	 	else
-	 	{
+		}
+		else
+		{
 			R_know = 0.01;
-	 		PrintString("error");
-	 	}
-	 	//选择已知电阻 结束
+			PrintString("error");
+		}
+		//选择已知电阻 结束
 
-	//	测量电压部分
-	 	for(cnt = 0;cnt < 50;cnt++)
-	 	{
-	 		StartADCConvert();
-	 	}
+		//	测量电压部分
+		for(cnt = 0;cnt < 50;cnt++)
+		{
+			StartADCConvert();
+		}
 
-	 	for(cnt = 0;cnt < 50;cnt++)
-	 	{
-	 		floatBuf = adcbuff[cnt]* 2.5 / 1023;
-	 		floatSum = floatSum + floatBuf;
-	 	}
-	 	floatSum = floatSum / 50.0;//模拟量平均值
-	 	PrintFloat(floatSum);
-	//  测量电压部分 结束
-	 	for(cnt = 0;cnt < 50;cnt++)
+		for(cnt = 0;cnt < 50;cnt++)
+		{
+			floatBuf = adcbuff[cnt]* 3.55208 / 1023;
+			floatSum = floatSum + floatBuf;
+		}
+		floatSum = floatSum / 50.0;//模拟量平均值
+		PrintFloat(floatSum);
+		//  测量电压部分 结束
+		for(cnt = 0;cnt < 50;cnt++)
 		{
 			adcbuff[cnt] = 0;
 		}
-	 	//计算待测电阻值
-	 	dianzuzhi = (floatSum*15000.0)/(2.5 - floatSum);//VR/(2.5-V)公式计算电阻值
-	 	//计算待测电阻值  结束
-	 	//打印输出
-	 	PrintString("the R value = ");
-	 	PrintFloat(dianzuzhi);
-	 	LCD_RValue(dianzuzhi);
-	 	//打印输出 结束
-	 	floatSum = 0;
+		//计算待测电阻值
+		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
+		//计算待测电阻值  结束
+		//打印输出
+		PrintString("the R value = ");
+		PrintFloat(dianzuzhi);
+		LCD_RValue(dianzuzhi);
+		//打印输出 结束
+		floatSum = 0;
 
-	 	__delay_cycles(8000000);
-  }
+/****测电阻部分结束*****/
+/****测量电容部分*******/
+		PrintFreq(freq);
+		Cvalue = 1000000.0*1.44/300.0/freq;
+		PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
+		PrintFloat(Cvalue);
+		LCD_CValue(Cvalue);
+		__delay_cycles(8000000);
+/****测量电容部分*******/
+
+//  	if(next == 1)
+//  	{
+//  	   goto measure;
+//  	}
+//  	else
+//  	{
+//    	// for(cnt = 0;cnt < 50;cnt ++)
+//    	// {
+//    	// 	writeWord(adcbuff[cnt],1);
+//    	// }
+//  	}
+	}
 }
 #pragma vector = PORT1_VECTOR
 __interrupt void Port1_ISR(void)
@@ -637,35 +664,66 @@ void LCD_Type_Vpp(char* type,float vpp)
 
 	LCD_write_string(0,0,type);
 	LCD_write_string(0,1,charbuff);
-
-
-
 }
-void LCD_Freq_Vrms(uint16_t freq,float vrms)
+void LCD_CValue(float Cvalue)
 {
-// send freq
-	uint8_t buff[8] = {'#','#','#','#','#','H','z','\0'};
-	uint8_t cnt = 0;
-	for(cnt = 0;cnt < 5;cnt ++)
-	{
-		buff[4 - cnt] = (uint8_t)(freq % 10 + '0');
-		freq /= 10;
-	}
-//	send vrms
-	uint8_t charbuff[] = {'#','#','#','#','.','#','#','#',' ',' ','m','V','r','m','s','\0'};
-	uint16_t interger = (uint16_t)vrms;
-	uint16_t pointNum = (uint16_t)((vrms - interger)*1000);
-	charbuff[0] = interger / 1000 % 10 + '0';
-	charbuff[1] = interger / 100 % 10 + '0';
-	charbuff[2] = interger / 10 % 10 + '0';
-	charbuff[3] = interger / 1 % 10 + '0';
-	/***************************************/
-	charbuff[5] = pointNum / 100 % 10 + '0';
-	charbuff[6] = pointNum / 10 % 10 + '0';
-	charbuff[7] = pointNum / 1 % 10 + '0';
+	const float Max10nFValue = 10.0;
+	const float Max100nFValue = 100.0;
+//	send Cvalue
+	uint8_t charbuff_nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','n','F','\0'};
+	uint8_t charbuff_10nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','n','F','\0'};
+	uint8_t charbuff_100nF[] = {'#','#','#','#','.','#','#','#',' ',' ','X','1','0','0','n','F','\0'};
 
-	LCD_write_string(0,0,buff);
-	LCD_write_string(0,1,charbuff);
+	uint16_t interger = (uint16_t)Cvalue;
+	uint16_t pointNum = (uint16_t)((Cvalue - interger)*1000);
+	// nF
+	charbuff_nF[0] = interger / 1000 % 10 + '0';
+	charbuff_nF[1] = interger / 100 % 10 + '0';
+	charbuff_nF[2] = interger / 10 % 10 + '0';
+	charbuff_nF[3] = interger / 1 % 10 + '0';
+	/***************************************/
+	charbuff_nF[5] = pointNum / 100 % 10 + '0';
+	charbuff_nF[6] = pointNum / 10 % 10 + '0';
+	charbuff_nF[7] = pointNum / 1 % 10 + '0';
+
+	uint16_t interger_10 = (uint16_t)(Cvalue/10.0);
+	uint16_t pointNum_10 = (uint16_t)((Cvalue/10.0 - interger_10)*1000);
+
+	// knF
+	charbuff_10nF[0] = interger_10 / 1000 % 10 + '0';
+	charbuff_10nF[1] = interger_10 / 100 % 10 + '0';
+	charbuff_10nF[2] = interger_10 / 10 % 10 + '0';
+	charbuff_10nF[3] = interger_10 / 1 % 10 + '0';
+	/***************************************/
+	charbuff_10nF[5] = pointNum_10 / 100 % 10 + '0';
+	charbuff_10nF[6] = pointNum_10 / 10 % 10 + '0';
+	charbuff_10nF[7] = pointNum_10 / 1 % 10 + '0';
+
+	uint16_t interger_100 = (uint16_t)(Cvalue/100.0);
+	uint16_t pointNum_100 = (uint16_t)((Cvalue/100.0 - interger_100)*1000);
+
+	// 10knF
+	charbuff_100nF[0] = interger_100 / 1000 % 10 + '0';
+	charbuff_100nF[1] = interger_100 / 100 % 10 + '0';
+	charbuff_100nF[2] = interger_100 / 10 % 10 + '0';
+	charbuff_100nF[3] = interger_100 / 1 % 10 + '0';
+	/***************************************/
+	charbuff_100nF[5] = pointNum_100 / 100 % 10 + '0';
+	charbuff_100nF[6] = pointNum_100 / 10 % 10 + '0';
+	charbuff_100nF[7] = pointNum_100 / 1 % 10 + '0';
+
+	if(Cvalue >= Max100nFValue)
+	{
+		LCD_write_string(0,0,charbuff_100nF);
+	}
+	else if(Cvalue >= Max10nFValue)
+	{
+		LCD_write_string(0,0,charbuff_10nF);
+	}
+	else
+	{
+		LCD_write_string(0,0,charbuff_nF);
+	}
 }
 void LCD_RValue(float Rvalue)
 {
@@ -726,6 +784,32 @@ void LCD_RValue(float Rvalue)
 	{
 		LCD_write_string(0,1,charbuff_ohm);
 	}
+}
+void LCD_Freq_Vrms(uint16_t freq,float vrms)
+{
+// send freq
+	uint8_t buff[8] = {'#','#','#','#','#','H','z','\0'};
+	uint8_t cnt = 0;
+	for(cnt = 0;cnt < 5;cnt ++)
+	{
+		buff[4 - cnt] = (uint8_t)(freq % 10 + '0');
+		freq /= 10;
+	}
+//	send vrms
+	uint8_t charbuff[] = {'#','#','#','#','.','#','#','#',' ',' ','m','V','r','m','s','\0'};
+	uint16_t interger = (uint16_t)vrms;
+	uint16_t pointNum = (uint16_t)((vrms - interger)*1000);
+	charbuff[0] = interger / 1000 % 10 + '0';
+	charbuff[1] = interger / 100 % 10 + '0';
+	charbuff[2] = interger / 10 % 10 + '0';
+	charbuff[3] = interger / 1 % 10 + '0';
+	/***************************************/
+	charbuff[5] = pointNum / 100 % 10 + '0';
+	charbuff[6] = pointNum / 10 % 10 + '0';
+	charbuff[7] = pointNum / 1 % 10 + '0';
+
+	LCD_write_string(0,0,buff);
+	LCD_write_string(0,1,charbuff);
 }
 uint8_t JudgeType(void)
 {
@@ -1015,7 +1099,6 @@ void PrintFloat(float num)
 	PrintString(charbuff);
 
 }
-
 void Print_Type_Real_Full(uint8_t type, float real,float full)
 {
 	//Type
