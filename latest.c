@@ -183,15 +183,15 @@ void main()
 
 
 	next = 0;
-	while(1)
-	{
-/****测电阻部分*****/
-		/**** 控制已知电阻 ****/
 		/**** initial for state 3 ***/
 		P2_0_SET_HIGH;//know = 10k
 		P2_1_SET_HIGH;//know = 1k
 		P2_2_SET_GND;//know = 100
 		/**** initial for state 3 结束***/
+	while(1)
+	{
+/****测电阻部分*****/
+		/**** 控制已知电阻 ****/
 		switch(displayStatus)
 		{
 			case 0:
@@ -270,12 +270,76 @@ void main()
 		}
 		//计算待测电阻值
 		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
+			//软调节电阻误差
+			if(dianzuzhi < 50.0)//10->9.4
+			{
+				dianzuzhi = dianzuzhi*1.0638;
+			}
+			else if(dianzuzhi <250.0)//100->81.7,200->164
+			{
+				dianzuzhi = dianzuzhi*1.224;
+			}
+			else if(dianzuzhi <2500.0)//2k-->?
+			{
+				dianzuzhi = dianzuzhi*1.234;
+			}
+			else if(dianzuzhi <6000.0)//
+			{
+
+			}
+			else if(dianzuzhi <8000.0)//6.8k-->?
+			{
+			}
+			else if(dianzuzhi <12000.0)//10k-->9772
+			{
+				dianzuzhi = dianzuzhi*1.0224;
+			}
+			//软调节电阻误差 结束
+
 		//计算待测电阻值  结束
 		if(displayStatus == 3)
 		{
 			suit(dianzuzhi);
 		}
 		//打印输出
+		switch(displayStatus)
+		{
+			case 0:
+			{
+				PrintString("status small 0");
+				break;
+			}
+			case 1:
+			{
+				PrintString("status mid 1");
+				break;
+			}
+			case 2:
+			{
+				PrintString("status big 2");
+				break;
+			}
+			case 3:
+			{
+				PrintString("status change 3");
+				break;
+			}
+		};
+		if(P2_0_IS_GND)
+		{
+			PrintString("R Range is big");
+		}
+		else if(P2_1_IS_GND)
+		{
+			PrintString("R Range is mid");
+
+		}
+		else if(P2_2_IS_GND)
+		{
+			PrintString("R Range is small");
+
+		}
+
 		PrintString("the R value = ");
 		PrintFloat(dianzuzhi);
 		LCD_RValue(dianzuzhi);
@@ -284,9 +348,13 @@ void main()
 
 /****测电阻部分结束*****/
 /****测量电容部分*******/
-    	freq = (float)(8000000.0) / totaltime;
+//    	freq = (float)(8000000.0) / totaltime;
 		PrintFreq(freq);
-		Cvalue = 1000000.0*1.44/360.0/freq;
+		Cvalue = 1000000.0*1.54176/360.0/freq;
+		if(Cvalue > 1.0)
+		{
+			Cvalue = Cvalue - 1.0;
+		}
 		PrintString("\nCvalue = ");//乘1000000，代表电容单位是纳法拉
 		PrintFloat(Cvalue);
 		LCD_CValue(Cvalue);
@@ -307,32 +375,26 @@ __interrupt void Port1_ISR(void)
 #pragma vector = TIMER1_A1_VECTOR
 __interrupt void Time_Tick(void)
 {
-	static uint8_t cnt = 0;
-	__bis_SR_register(GIE);//允许中断嵌套
+  __bis_SR_register(GIE);//允许中断嵌套
 	switch(TA1IV)
 	{
-	case 0x02://捕捉比较中断1
+	case 0x02:break;
+	case 0x04:
+		freqCnt++;
 		break;
-	case 0x04://捕捉比较中断2
-		if(cnt == 0)
+	case 0x0A:
+		if(T >= t_1s)
 		{
-			capvalue_1 = TA1CCR2;//保存第一次捕捉值
-			timestamp_1 = timestamp;//保存第一次时间戳
-			cnt ++;
+			T = 0;
+			freq = (float)freqCnt;
+			freqCnt = 0;
 		}
 		else
 		{
-			capvalue_2 = TA1CCR2;//保存第二次捕捉值
-			timestamp_2 = timestamp;//保存第二次时间戳
-			cnt = 0;
-			totaltime = (timestamp_2 - timestamp_1) * 50000 + capvalue_2 - capvalue_1;//计算总时间
+			T++;
 		}
 		break;
-	case 0x0A://溢出中断
-		timestamp ++;
-		break;
-	default:
-		break;
+	default:break;
 	}
 }
 /*
@@ -411,24 +473,20 @@ void IniUART(void)
 }
 void IniTimerA1_ct()
 {
-    /*设置时钟源为SMCLK*/
-    TA1CTL |= TASSEL_2;
-    /*设置工作模式为Up Mode*/
-    TA1CTL |= MC_1;
-    /*设置定时间隔*/
-    TA1CCR0 = 49999;//50ms
-    /*开启TAIFG中断*/
-    TA1CTL |= TAIE;
-
-    /*TA1,CCR2用于捕捉功能*/
-    TA1CCTL2 |= CAP;
-    /*上升沿捕捉*/
-    TA1CCTL2 |= CM0;
-    /*P2.5作为捕捉输入(CCI2B)*/
-    TA1CCTL2 |= CCIS0;
-    P2SEL |= BIT5;
-    /*允许捕捉比较中断*/
-    TA1CCTL2 |= CCIE;
+	TA1CTL |= TASSEL_2;
+	TA1CTL |= MC_1;
+	TA1CTL |= ID_3;
+	TA1CCR0 = 49000;//50000 * 1us * 20 = 1s//此数越小,所得到电容值越大
+	/***定时器A1溢出中断***/
+	TA1CTL |= TAIE;
+	//将捕捉时计数值存入TA1CCR2
+	TA1CCTL2 |= CAP;
+	TA1CCTL2 |= CM_1;
+	TA1CCTL2 |= CCIS_1;//输入选择B通道
+	//IO定时器输入复用
+	P2SEL |= BIT5;
+	P2DIR &= ~BIT5;
+	TA1CCTL2 |= CCIE;//允许捕捉中断(CCIFG的)
 }
 /********************************************
 
@@ -625,7 +683,7 @@ void LCD_write_char(unsigned char X,unsigned char Y,unsigned char data)
 
 void delay_1us(void)
 {
-   asm("nop");
+	asm("nop");
 }
 
 /*****************************************
