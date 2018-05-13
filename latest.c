@@ -270,6 +270,11 @@ void main()
 		}
 		//计算待测电阻值
 		dianzuzhi = (2.5 - floatSum)*R_know/floatSum ;//(2.5-V)*R_know/V公式计算电阻值
+		//计算待测电阻值  结束
+		if(displayStatus == 3)
+		{
+			suit(dianzuzhi);
+		}
 			//软调节电阻误差
 			if(dianzuzhi < 50.0)//10->9.4
 			{
@@ -296,11 +301,6 @@ void main()
 			}
 			//软调节电阻误差 结束
 
-		//计算待测电阻值  结束
-		if(displayStatus == 3)
-		{
-			suit(dianzuzhi);
-		}
 		//打印输出
 		switch(displayStatus)
 		{
